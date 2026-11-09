@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>modu.tip — 신혼 생활 지도</title>
+    <!-- 트렌디한 모바일 전용 폰트: Pretendard -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- 카카오맵 SDK (앱키 포함, 카카오 지도용은 leaflet CSS가 아예 필요 없습니다) -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=974ee021c08cd32057cf430f364e1e40&libraries=services"></script>
+    
+    <!-- 디자인 파일 연결 -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="phone-container">
+        
+        <!-- 딤 오버레이 -->
+        <div id="searchDimOverlay" class="search-dim-overlay" onclick="closeSearch()"></div>
+
+        <!-- 1. 로그인 화면 -->
+        <div id="screen-login" class="">
+            <div class="login-hero">
+                <div class="app-logo-icon">
+                    <svg width="56" height="56" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M50 15 C25 15, 20 40, 20 60 C20 85, 40 95, 50 95 C60 95, 80 85, 80 60 C80 40, 75 15, 50 15 Z" fill="#2563eb" />
+                        <path d="M50 30 C35 30, 32 45, 32 55 C32 65, 42 70, 50 70 C58 70, 68 65, 68 55 C68 45, 65 30, 50 30 Z" fill="#ffffff" />
+                    </svg>
+                </div>
+                <div class="login-logo">modu.tip</div>
+                <div class="title" style="margin-top: 4px; font-size: 24px;">우리 동네 신혼 생활 지도</div>
+                <p class="login-desc">로그인하고 우리 동네 맞춤형 산후조리원 및<br>결혼식장 정보를 손쉽게 확인해보세요!</p>
+            </div>
+            <div class="login-btn-group">
+                <button class="social-btn btn-kakao" onclick="handleLogin('카카오')">카카오로 3초 만에 시작하기</button>
+                <button class="social-btn btn-naver" onclick="handleLogin('네이버')">네이버로 간편 로그인</button>
+                <button class="social-btn btn-google" onclick="handleLogin('구글')">구글로 계속하기</button>
+                <button class="social-btn btn-free" onclick="handleLogin('체험용 계정')">로그인 없이 둘러보기</button>
+            </div>
+        </div>
+
+        <!-- 2. 홈 화면 -->
+        <div id="screen-home" class="screen-content">
+            <div class="header">
+                <div class="logo">modu.tip</div>
+                <div class="title">신혼 생활 홈</div>
+            </div>
+            <div class="tab-body">
+                <div style="background: white; border: 1px solid var(--border); border-radius: 24px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                    <h3 style="margin-bottom: 12px; color: var(--text-main); font-size: 20px;">환영합니다!</h3>
+                    <p style="font-size: 15px; color: var(--text-sub); line-height: 1.6;">신혼부부를 위한 필수 지도 정보와 맞춤 추천을 하단 지도 탭에서 확인해보세요.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 지도 화면 -->
+        <div id="screen-map" class="screen-content active">
+            <div class="header" style="z-index: 1050;">
+                <div class="logo">modu.tip</div>
+                
+                <!-- 통합 검색창 -->
+                <div class="search-area-wrapper">
+                    <div class="search-bar-container" id="searchContainer">
+                        <svg class="svg-icon" style="color:var(--primary)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+                        <input type="text" id="mapSearchInput" placeholder="장소, 역, 도로명 주소 검색" autocomplete="off" onfocus="openSearch()" oninput="handleSearchInput()" onkeydown="if(event.key === 'Enter') executeSearch(true)">
+                        <button id="clearSearchBtn" class="search-clear-btn" onclick="clearSearch()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px; height:12px;"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <!-- 자동완성 드롭다운 -->
+                    <div class="search-dropdown" id="searchDropdown"></div>
+                </div>
+
+                <div class="filter-tags">
+                    <span class="tag active" onclick="filterPlaces('all', this)">전체</span>
+                    <span class="tag" onclick="filterPlaces('postpartum', this)">산후조리원</span>
+                    <span class="tag" onclick="filterPlaces('wedding', this)">결혼식장</span>
+                    <span class="tag" onclick="filterPlaces('hospital', this)">병원</span>
+                </div>
+            </div>
+
+            <div class="map-area">
+                <!-- 카카오 지도가 들어갈 영역 -->
+                <div id="map" style="width:100%; height:100%;"></div>
+                
+                <button id="btnSearchInArea" class="floating-search-area-btn hidden" onclick="searchInArea()">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+                    현 지도에서 검색
+                </button>
+                <button class="floating-my-pos-btn" onclick="moveToMyPosition()">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+                <button class="floating-grade-btn" onclick="openGradeModal()" title="시설 등급 관리">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                </button>
+                <button class="floating-list-btn" onclick="toggleSheet()">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                    목록보기
+                </button>
+            </div>
+
+            <div class="content-sheet" id="contentSheet">
+                <div class="sheet-header">
+                    <span id="listTitle">주변 시설 목록</span>
+                    <span id="listCount" style="color: var(--primary);">0곳</span>
+                </div>
+                <div id="cardListContainer"></div>
+            </div>
+        </div>
+
+        <!-- 4. 저장 화면 -->
+        <div id="screen-saved" class="screen-content">
+            <div class="header"><div class="logo">modu.tip</div><div class="title">저장된 목록</div></div>
+            <div class="tab-body" id="savedListContainer" style="padding-top: 0;"></div>
+        </div>
+
+        <!-- 5. MY 화면 -->
+        <div id="screen-my" class="screen-content">
+            <div class="header" style="border-bottom: none;"><div class="logo">modu.tip</div><div class="title" style="margin-bottom: 0;">마이 페이지</div></div>
+            <div class="tab-body" style="padding-top: 0;">
+                <div style="background: var(--surface); border-radius: 24px; padding: 24px; border: 1px solid var(--border); display: flex; align-items: center; gap: 20px;">
+                    <div style="width: 60px; height: 60px; background: var(--bg-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                        <svg class="svg-icon" style="width:30px; height:30px;" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <div>
+                        <div style="font-size: 20px; font-weight: 800; color: var(--text-main); margin-bottom:4px;" id="userProfileName">예비부부 님</div>
+                        <div style="font-size: 14px; color: var(--text-sub);" id="userEmailDisplay">로그인 정보 없음</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="section-title">내 활동</div>
+                    <div class="menu-group">
+                        <div class="menu-item" onclick="switchTab('saved', document.querySelectorAll('.nav-item')[2])"><span>저장한 정보</span><span id="savedCountBadge" style="font-weight: 700; color: var(--primary);">0</span></div>
+                        <div class="menu-item" onclick="openRecentModal()"><span>최근 본 정보</span><span id="recentCountBadge" style="font-weight: 700; color: var(--primary);">0곳</span></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="section-title">계정 및 설정</div>
+                    <div class="menu-group">
+                        <div class="menu-item" onclick="handleIdChange()"><span>아이디 변경</span><span><svg class="svg-icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg></span></div>
+                        <div class="menu-item" onclick="handleNotificationSetting()"><span>알림 설정</span><span style="color: var(--primary); font-weight: 700;">켜짐</span></div>
+                        <div class="menu-item" onclick="handleLocationSetting()"><span>위치 권한</span><span><svg class="svg-icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg></span></div>
+                        <div class="menu-item" onclick="alert('고객센터 준비중입니다.')"><span>고객센터</span><span><svg class="svg-icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg></span></div>
+                        <div class="menu-item" onclick="handleLogout()" style="color: #ef4444; font-weight: 700;"><span>로그아웃</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 공통 요약 모달 -->
+        <div id="placeModal" class="modal-overlay" onclick="closeModal(event)">
+            <div class="modal-card" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+                <div class="modal-title" id="modalName">장소 이름</div>
+                <div class="modal-badge-row" id="modalBadgeRow">
+                    <div class="badge grade-a" id="modalBadge">A</div>
+                    <span id="modalCategory">카테고리</span>
+                </div>
+                
+                <div class="summary-grid" id="modalDetailsContainer"></div>
+                <div class="modal-buttons" id="modalButtonsContainer"></div>
+            </div>
+        </div>
+
+        <!-- 하단 네비게이션 바 -->
+        <div class="bottom-nav">
+            <button class="nav-item" onclick="switchTab('home', this)">
+                <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> 홈
+            </button>
+            <button class="nav-item active" onclick="switchTab('map', this)">
+                <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg> 지도
+            </button>
+            <button class="nav-item" onclick="switchTab('saved', this)">
+                <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg> 저장
+            </button>
+            <button class="nav-item" onclick="switchTab('my', this)">
+                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> MY
+            </button>
+        </div>
+    </div>
+
+    <!-- 기능 파일(app.js) 연결 -->
+    <script src="app.js"></script>
+</body>
+</html>
